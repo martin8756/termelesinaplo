@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termelési Napló</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Termelési Napló</h1>
+    <form action="/login" method="POST">
+        <input type="password" name="password" placeholder="Jelszó">
+        <button type="submit">Belépés adminba</button>
+    </form>
+
+    <h2>Új bejegyzés</h2>
+    <form action="/add" method="POST">
+        <input type="date" name="date" value="" required>
+        <input type="text" name="machine" placeholder="Gép" required>
+        <input type="text" name="product" placeholder="Termék" required>
+        <input type="number" name="quantity" placeholder="Darabszám" required>
+        <input type="number" name="scrap" placeholder="Selejt">
+        <input type="text" name="note" placeholder="Megjegyzés">
+        <button type="submit">Mentés</button>
+    </form>
+</body>
+</html>
