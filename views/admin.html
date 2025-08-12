@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Termelési Napló</title>
+    <link rel="stylesheet" href="../public/style.css">
+</head>
+<body>
+    <h1>Admin nézet</h1>
+    <table border="1" style="margin:auto; color:white;">
+        <thead>
+            <tr>
+                <th>Dátum</th>
+                <th>Gép</th>
+                <th>Termék</th>
+                <th>Darabszám</th>
+                <th>Selejt</th>
+                <th>Megjegyzés</th>
+            </tr>
+        </thead>
+        <tbody id="entries"></tbody>
+    </table>
+
+    <script>
+        fetch("/data")
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById("entries");
+                data.forEach(e => {
+                    const row = `<tr>
+                        <td>${e.date}</td>
+                        <td>${e.machine}</td>
+                        <td>${e.product}</td>
+                        <td>${e.quantity}</td>
+                        <td>${e.scrap}</td>
+                        <td>${e.note}</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            });
+    </script>
+</body>
+</html>
