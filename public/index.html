@@ -1,27 +1,128 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="hu">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Termelési Napló</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Termelési napló</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <h1>Termelési Napló</h1>
-    <form action="/login" method="POST">
-        <input type="password" name="password" placeholder="Jelszó">
-        <button type="submit">Belépés adminba</button>
-    </form>
+  <div class="wrap">
+    <div id="loginView" class="card center">
+      <h1>CsisziCut</h1>
+      <p class="muted">Termelési napló (belépés a közös jelszóval)</p>
+      <input id="pw" type="password" placeholder="Jelszó (pl. 1234)" />
+      <button id="loginBtn" class="btn">Belépés</button>
+      <p id="loginErr" class="error" style="display:none;"></p>
+      <p class="muted" style="margin-top:8px;">Admin felület: belépés után <strong>/admin</strong></p>
+    </div>
 
-    <h2>Új bejegyzés</h2>
-    <form action="/add" method="POST">
-        <input type="date" name="date" value="" required>
-        <input type="text" name="machine" placeholder="Gép" required>
-        <input type="text" name="product" placeholder="Termék" required>
-        <input type="number" name="quantity" placeholder="Darabszám" required>
-        <input type="number" name="scrap" placeholder="Selejt">
-        <input type="text" name="note" placeholder="Megjegyzés">
-        <button type="submit">Mentés</button>
-    </form>
+    <div id="appView" style="display:none;">
+      <header class="topbar">
+        <div class="brand">Termelés rögzítése</div>
+        <div class="actions">
+          <a href="/admin" class="btn small">Admin</a>
+          <button id="logoutBtn" class="btn small">Kilépés</button>
+        </div>
+      </header>
+
+      <main class="container">
+        <section class="card">
+          <h2>Új bejegyzés</h2>
+          <form id="frm">
+            <label>Dátum</label>
+            <input id="f_date" type="date" required />
+            <label>Gép / Munkahely</label>
+            <input id="f_machine" type="text" placeholder="pl. Gép1" required />
+            <label>Termék kód / név</label>
+            <input id="f_product" type="text" placeholder="pl. ABC-123" required />
+            <label>Darabszám</label>
+            <input id="f_qty" type="number" min="0" required />
+            <label>Selejt</label>
+            <input id="f_rej" type="number" min="0" value="0" />
+            <label>Megjegyzés</label>
+            <input id="f_note" type="text" placeholder="opcionális" />
+            <button class="btn" type="submit" style="margin-top:10px;">Mentés</button>
+            <p id="saveMsg" class="muted" style="margin-top:8px;"></p>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Utolsó bejegyzések</h2>
+          <div id="list" class="records"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    const loginView = $("#loginView");
+    const appView   = $("#appView");
+
+    const today = new Date().toISOString().slice(0,10);
+    $("#f_date").value = today;
+
+    async function api(path, opts={}){
+      const r = await fetch(path, opts);
+      if(r.status===401) throw new Error("auth");
+      return await r.json();
+    }
+
+    $("#loginBtn").onclick = async ()=>{
+      $("#loginErr").style.display="none";
+      const pw = $("#pw").value.trim();
+      if(!pw){ $("#loginErr").textContent="Add meg a jelszót"; $("#loginErr").style.display="block"; return; }
+      try{
+        const res = await api("/api/login", {method:"POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})});
+        if(res.ok){ showApp(); loadList(); } else { $("#loginErr").textContent=res.message||"Hiba"; $("#loginErr").style.display="block"; }
+      }catch(e){ $("#loginErr").textContent="Hibás jelszó"; $("#loginErr").style.display="block"; }
+    };
+
+    $("#logoutBtn").onclick = async ()=>{ await fetch("/api/logout",{method:"POST"}); showLogin(); };
+
+    function showApp(){ loginView.style.display="none"; appView.style.display="block"; }
+    function showLogin(){ loginView.style.display="block"; appView.style.display="none"; }
+
+    $("#frm").onsubmit = async (e)=>{
+      e.preventDefault();
+      const payload = {
+        date: $("#f_date").value,
+        machine: $("#f_machine").value.trim(),
+        product: $("#f_product").value.trim(),
+        quantity: Number($("#f_qty").value),
+        rejects: Number($("#f_rej").value||0),
+        note: $("#f_note").value.trim()
+      };
+      try{
+        const res = await api("/api/records",{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        if(res.ok){ $("#saveMsg").textContent="Mentve!"; e.target.reset(); $("#f_date").value = today; $("#f_rej").value = 0; loadList(); setTimeout(()=>$("#saveMsg").textContent="",2000); }
+        else { $("#saveMsg").textContent=res.message||"Hiba"; }
+      }catch(e){ if(e.message==="auth") showLogin(); else $("#saveMsg").textContent="Hálózati hiba"; }
+    };
+
+    async function loadList(){
+      const box = $("#list");
+      box.innerHTML = '<p class="muted">Betöltés…</p>';
+      try{
+        const res = await api("/api/records");
+        if(res.ok && res.rows.length){
+          box.innerHTML = res.rows.map(r=>`
+            <div class="record">
+              <div class="meta"><span>${r.date}</span><span>${new Date(r.created_at).toLocaleString()}</span></div>
+              <div class="main">${escapeHtml(r.product)} — ${escapeHtml(r.machine)}</div>
+              <div class="meta"><span>Darab: <strong>${r.quantity}</strong></span><span>Selejt: <strong>${r.rejects}</strong></span></div>
+              ${r.note?`<div class="muted">Megjegyzés: ${escapeHtml(r.note)}</div>`:""}
+            </div>
+          `).join("");
+        } else { box.innerHTML = '<p class="muted">Még nincs bejegyzés.</p>'; }
+      }catch(e){ box.innerHTML = '<p class="muted">Nem sikerült betölteni.</p>'; }
+    }
+
+    function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+    // próbáljuk visszatölteni a sessiont
+    (async()=>{ try{ const r=await fetch("/api/records"); if(r.status===200){ showApp(); loadList(); } }catch(_){ /* ignored */ }})();
+  </script>
 </body>
 </html>
